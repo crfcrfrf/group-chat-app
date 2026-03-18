@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>群聊应用</title>
+    <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      :root {
+        font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+        line-height: 1.5;
+        font-weight: 400;
+
+        color-scheme: light dark;
+        color: rgba(255, 255, 255, 0.87);
+        background-color: #242424;
+
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      body {
+        margin: 0;
+        display: flex;
+        place-items: center;
+        min-width: 320px;
+        min-height: 100vh;
+      }
+
+      #root {
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 2rem;
+        text-align: center;
+      }
+
+      button {
+        border-radius: 8px;
+        border: 1px solid transparent;
+        padding: 0.6em 1.2em;
+        font-size: 1em;
+        font-weight: 500;
+        font-family: inherit;
+        background-color: #1a1a1a;
+        cursor: pointer;
+        transition: border-color 0.25s;
+      }
+      button:hover {
+        border-color: #646cff;
+      }
+      button:focus,
+      button:focus-visible {
+        outline: 4px auto -webkit-focus-ring-color;
+      }
+
+      input {
+        border-radius: 8px;
+        border: 1px solid #333;
+        padding: 0.6em 1.2em;
+        font-size: 1em;
+        font-family: inherit;
+        background-color: #1a1a1a;
+        color: rgba(255, 255, 255, 0.87);
+        margin: 0.5rem 0;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .form-container {
+        max-width: 400px;
+        margin: 0 auto;
+        text-align: left;
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+
+      .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 70vh;
+        border: 1px solid #333;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .chat-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        text-align: left;
+      }
+
+      .message {
+        margin-bottom: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        max-width: 80%;
+      }
+
+      .message.own {
+        background-color: #333;
+        align-self: flex-end;
+        margin-left: auto;
+      }
+
+      .message.other {
+        background-color: #222;
+        align-self: flex-start;
+      }
+
+      .message-author {
+        font-size: 0.8rem;
+        color: #888;
+        margin-bottom: 0.25rem;
+      }
+
+      .chat-input {
+        display: flex;
+        padding: 1rem;
+        border-top: 1px solid #333;
+      }
+
+      .chat-input input {
+        flex: 1;
+        margin-right: 0.5rem;
+      }
+
+      .chat-input button {
+        width: 100px;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          color: #213547;
+          background-color: #ffffff;
+        }
+        button {
+          background-color: #f9f9f9;
+        }
+        input {
+          background-color: #f9f9f9;
+          color: #213547;
+          border-color: #ddd;
+        }
+        .message.own {
+          background-color: #e3f2fd;
+        }
+        .message.other {
+          background-color: #f1f1f1;
+        }
+        .chat-container {
+          border-color: #ddd;
+        }
+        .chat-input {
+          border-top-color: #ddd;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      function App() {
+        // 状态管理
+        const [isAuthenticated, setIsAuthenticated] = useState(false);
+        const [currentUser, setCurrentUser] = useState(null);
+        const [isRegistering, setIsRegistering] = useState(false);
+        const [username, setUsername] = useState('');
+        const [password, setPassword] = useState('');
+        const [error, setError] = useState('');
+        const [messages, setMessages] = useState([]);
+        const [messageInput, setMessageInput] = useState('');
+
+        // 初始化时检查本地存储中的用户和消息
+        useEffect(() => {
+          const storedUser = localStorage.getItem('currentUser');
+          if (storedUser) {
+            setCurrentUser(JSON.parse(storedUser));
+            setIsAuthenticated(true);
+          }
+
+          const storedMessages = localStorage.getItem('chatMessages');
+          if (storedMessages) {
+            setMessages(JSON.parse(storedMessages));
+          }
+        }, []);
+
+        // 保存消息到本地存储
+        useEffect(() => {
+          if (messages.length > 0) {
+            localStorage.setItem('chatMessages', JSON.stringify(messages));
+          }
+        }, [messages]);
+
+        // 处理注册
+        const handleRegister = (e) => {
+          e.preventDefault();
+          
+          if (!username || !password) {
+            setError('请填写所有字段');
+            return;
+          }
+
+          // 检查用户是否已存在
+          const users = JSON.parse(localStorage.getItem('users') || '[]');
+          const existingUser = users.find(user => user.username === username);
+          
+          if (existingUser) {
+            setError('用户名已存在');
+            return;
+          }
+
+          // 创建新用户
+          const newUser = { username, password };
+          users.push(newUser);
+          localStorage.setItem('users', JSON.stringify(users));
+
+          // 自动登录
+          localStorage.setItem('currentUser', JSON.stringify(newUser));
+          setCurrentUser(newUser);
+          setIsAuthenticated(true);
+          setError('');
+        };
+
+        // 处理登录
+        const handleLogin = (e) => {
+          e.preventDefault();
+          
+          if (!username || !password) {
+            setError('请填写所有字段');
+            return;
+          }
+
+          // 验证用户
+          const users = JSON.parse(localStorage.getItem('users') || '[]');
+          const user = users.find(user => user.username === username && user.password === password);
+          
+          if (user) {
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            setCurrentUser(user);
+            setIsAuthenticated(true);
+            setError('');
+          } else {
+            setError('用户名或密码错误');
+          }
+        };
+
+        // 处理登出
+        const handleLogout = () => {
+          localStorage.removeItem('currentUser');
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+        };
+
+        // 发送消息
+        const handleSendMessage = () => {
+          if (!messageInput.trim()) return;
+
+          const newMessage = {
+            id: Date.now(),
+            author: currentUser.username,
+            content: messageInput,
+            timestamp: new Date().toLocaleString()
+          };
+
+          setMessages([...messages, newMessage]);
+          setMessageInput('');
+        };
+
+        // 渲染登录/注册表单
+        const renderAuthForm = () => (
+          <div className="form-container">
+            <h2>{isRegistering ? '注册' : '登录'}</h2>
+            {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
+            <form onSubmit={isRegistering ? handleRegister : handleLogin}>
+              <div className="form-group">
+                <label htmlFor="username">用户名</label>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="请输入用户名"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="password">密码</label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="请输入密码"
+                />
+              </div>
+              <button type="submit">{isRegistering ? '注册' : '登录'}</button>
+            </form>
+            <p style={{ marginTop: '1rem' }}>
+              {isRegistering ? '已有账号？' : '还没有账号？'}
+              <button 
+                onClick={() => setIsRegistering(!isRegistering)}
+                style={{ background: 'none', border: 'none', color: '#646cff', padding: 0, cursor: 'pointer' }}
+              >
+                {isRegistering ? '去登录' : '去注册'}
+              </button>
+            </p>
+          </div>
+        );
+
+        // 渲染群聊界面
+        const renderChat = () => (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2>群聊</h2>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ marginRight: '1rem' }}>欢迎, {currentUser.username}</span>
+                <button onClick={handleLogout}>登出</button>
+              </div>
+            </div>
+            <div className="chat-container">
+              <div className="chat-messages">
+                {messages.map(message => (
+                  <div 
+                    key={message.id} 
+                    className={`message ${message.author === currentUser.username ? 'own' : 'other'}`}
+                  >
+                    <div className="message-author">
+                      {message.author} {message.timestamp}
+                    </div>
+                    <div>{message.content}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="chat-input">
+                <input
+                  type="text"
+                  value={messageInput}
+                  onChange={(e) => setMessageInput(e.target.value)}
+                  placeholder="输入消息..."
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                />
+                <button onClick={handleSendMessage}>发送</button>
+              </div>
+            </div>
+          </div>
+        );
+
+        return (
+          <div>
+            {isAuthenticated ? renderChat() : renderAuthForm()}
+          </div>
+        );
+      }
+
+      ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+  </body>
+</html>
